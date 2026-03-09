@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>会計帳簿システム</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>会計帳簿システム</h1>
+      <p>既存Excel帳簿の置き換えを想定したネイティブアプリ</p>
+    </header>
+
+    <main class="grid">
+      <section class="card">
+        <h2>帳簿登録</h2>
+        <form id="ledger-form">
+          <label>日付<input type="date" name="date" required /></label>
+          <label>勘定科目<input type="text" name="accountItem" placeholder="旅費交通費" required /></label>
+          <label>内容<input type="text" name="description" placeholder="出張交通費" required /></label>
+          <label>金額<input type="number" name="amount" min="0" required /></label>
+          <label>
+            区分
+            <select name="category" required>
+              <option value="支出">支出</option>
+              <option value="収入">収入</option>
+            </select>
+          </label>
+          <label>部署<input type="text" name="department" placeholder="総務部" required /></label>
+          <button type="submit">登録</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>検索条件</h2>
+        <form id="filter-form" class="inline-form">
+          <label>対象月<input type="month" name="yearMonth" /></label>
+          <label>部署<input type="text" name="department" placeholder="すべて" /></label>
+          <button type="submit">再表示</button>
+        </form>
+
+        <h3>月次集計</h3>
+        <ul id="summary"></ul>
+      </section>
+
+      <section class="card wide">
+        <h2>帳簿一覧</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>勘定科目</th>
+              <th>内容</th>
+              <th>金額</th>
+              <th>区分</th>
+              <th>部署</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ledger-rows"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
