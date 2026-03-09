@@ -42,3 +42,9 @@ export interface ExportResult {
   canceled: boolean;
   filePath?: string;
 }
+
+export interface ImportResult {
+  canceled: boolean;
+  importedCount?: number;
+  errors?: string[];
+}

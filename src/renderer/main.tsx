@@ -142,9 +142,30 @@ function App(): React.JSX.Element {
     setStatusMessage("設定を保存しました。");
   }
 
-  async function handleExport(): Promise<void> {
+  async function handleExportCsv(): Promise<void> {
     const result = await window.ledgerApi.exportCsv(filters);
     setStatusMessage(result.canceled ? "CSV出力をキャンセルしました。" : `CSVを出力しました: ${result.filePath}`);
+  }
+
+  async function handleExportExcel(): Promise<void> {
+    const result = await window.ledgerApi.exportExcel(filters);
+    setStatusMessage(result.canceled ? "Excel出力をキャンセルしました。" : `Excelを出力しました: ${result.filePath}`);
+  }
+
+  async function handleImportExcel(): Promise<void> {
+    const result = await window.ledgerApi.importExcel();
+    if (result.canceled) {
+      setStatusMessage("Excel取込をキャンセルしました。");
+      return;
+    }
+
+    await refreshDashboard();
+    if ((result.errors?.length ?? 0) > 0) {
+      setStatusMessage(`Excelを${result.importedCount ?? 0}件取り込みました（エラー${result.errors?.length ?? 0}件）。`);
+      return;
+    }
+
+    setStatusMessage(`Excelを${result.importedCount ?? 0}件取り込みました。`);
   }
 
   async function handleSeed(): Promise<void> {
@@ -174,7 +195,7 @@ function App(): React.JSX.Element {
               <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-300/80">Business Ledger Workspace</p>
               <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white lg:text-5xl">{settings.organizationName}</h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">
-                伝票入力、月次サマリー、検索、CSV 出力を 1 つのデスクトップ画面に統合した業務帳票アプリです。
+                伝票入力、月次サマリー、検索、Excel/CSV 入出力を 1 つのデスクトップ画面に統合した業務帳票アプリです。
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -219,12 +240,18 @@ function App(): React.JSX.Element {
               </form>
             </Panel>
 
-            <Panel title="データ操作" subtitle="サンプル生成や CSV 出力をここから実行します。">
+            <Panel title="データ操作" subtitle="サンプル生成や Excel/CSV 入出力をここから実行します。">
               <div className="grid gap-3">
                 <button className="h-12 rounded-2xl border border-cyan-400/30 bg-cyan-400/10 font-medium text-cyan-200 hover:bg-cyan-400/20" type="button" onClick={handleSeed}>
                   サンプルデータを投入
                 </button>
-                <button className="h-12 rounded-2xl border border-white/10 bg-white/5 font-medium text-white hover:bg-white/10" type="button" onClick={handleExport}>
+                <button className="h-12 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 font-medium text-emerald-100 hover:bg-emerald-400/20" type="button" onClick={handleImportExcel}>
+                  Excel を取り込む
+                </button>
+                <button className="h-12 rounded-2xl border border-white/10 bg-white/5 font-medium text-white hover:bg-white/10" type="button" onClick={handleExportExcel}>
+                  Excel を出力
+                </button>
+                <button className="h-12 rounded-2xl border border-white/10 bg-white/5 font-medium text-white hover:bg-white/10" type="button" onClick={handleExportCsv}>
                   CSV を出力
                 </button>
               </div>
