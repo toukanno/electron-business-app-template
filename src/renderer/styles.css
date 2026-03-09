@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply min-h-screen bg-slate-950 text-slate-100 antialiased;
+    background-image:
+      radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(244, 114, 182, 0.16), transparent 24%),
+      linear-gradient(160deg, #020617 0%, #0f172a 48%, #111827 100%);
+  }
+
+  button {
+    @apply transition duration-150 ease-out;
+  }
+
+  input,
+  select,
+  textarea {
+    @apply outline-none;
+  }
+}
+
+@layer components {
+  .input {
+    @apply h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white placeholder:text-slate-500;
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "name": "electron-business-app-template",
+  "version": "1.0.0",
+  "description": "Electron-based business ledger desktop app",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && tsc -p tsconfig.main.json && node scripts/build-renderer.mjs",
+    "dev": "npm run build && electron .",
+    "start": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win portable",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/toukanno/electron-business-app-template.git"
+  },
+  "keywords": [
+    "electron",
+    "typescript",
+    "sqlite",
+    "accounting"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/toukanno/electron-business-app-template/issues"
+  },
+  "homepage": "https://github.com/toukanno/electron-business-app-template#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.1",
+    "@types/node": "^24.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "electron": "^40.8.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.25.10",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "build": {
+    "appId": "jp.toukanno.ledger",
+    "productName": "帳票管理デスクトップ",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    }
+  }
+}
