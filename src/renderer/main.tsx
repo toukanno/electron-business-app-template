@@ -69,6 +69,10 @@ function App(): React.JSX.Element {
   const [settings, setSettings] = useState<AppSettings>({ organizationName: "帳票管理", fiscalYearStartMonth: 4 });
   const [statusMessage, setStatusMessage] = useState("");
 
+  function toErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+  }
+
   async function refreshDashboard(nextFilters: LedgerFilters = filters): Promise<void> {
     const [nextEntries, nextSummary] = await Promise.all([
       window.ledgerApi.listEntries(nextFilters),
@@ -117,52 +121,72 @@ function App(): React.JSX.Element {
       return;
     }
 
-    await window.ledgerApi.saveEntry({
-      id: form.id,
-      entryDate: form.entryDate,
-      voucherNumber: form.voucherNumber.trim(),
-      department: form.department.trim(),
-      accountTitle: form.accountTitle.trim(),
-      counterparty: form.counterparty.trim(),
-      description: form.description.trim(),
-      entryType: form.entryType,
-      amount,
-      taxAmount,
-      notes: form.notes.trim()
-    });
-    resetForm();
-    await refreshDashboard();
-    setStatusMessage("伝票を保存しました。");
+    try {
+      await window.ledgerApi.saveEntry({
+        id: form.id,
+        entryDate: form.entryDate,
+        voucherNumber: form.voucherNumber.trim(),
+        department: form.department.trim(),
+        accountTitle: form.accountTitle.trim(),
+        counterparty: form.counterparty.trim(),
+        description: form.description.trim(),
+        entryType: form.entryType,
+        amount,
+        taxAmount,
+        notes: form.notes.trim()
+      });
+      resetForm();
+      await refreshDashboard();
+      setStatusMessage("伝票を保存しました。");
+    } catch (error) {
+      setStatusMessage(toErrorMessage(error, "伝票の保存に失敗しました。"));
+    }
   }
 
   async function handleSaveSettings(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    const saved = await window.ledgerApi.saveSettings(settings);
-    setSettings(saved);
-    setStatusMessage("設定を保存しました。");
+    try {
+      const saved = await window.ledgerApi.saveSettings(settings);
+      setSettings(saved);
+      setStatusMessage("設定を保存しました。");
+    } catch (error) {
+      setStatusMessage(toErrorMessage(error, "設定の保存に失敗しました。"));
+    }
   }
 
   async function handleExport(): Promise<void> {
-    const result = await window.ledgerApi.exportCsv(filters);
-    setStatusMessage(result.canceled ? "CSV出力をキャンセルしました。" : `CSVを出力しました: ${result.filePath}`);
+    try {
+      const result = await window.ledgerApi.exportCsv(filters);
+      setStatusMessage(result.canceled ? "CSV出力をキャンセルしました。" : `CSVを出力しました: ${result.filePath}`);
+    } catch (error) {
+      setStatusMessage(toErrorMessage(error, "CSV出力に失敗しました。"));
+    }
   }
 
   async function handleSeed(): Promise<void> {
-    await window.ledgerApi.seedDemoData();
-    await refreshDashboard();
-    setStatusMessage("サンプルデータを投入しました。");
+    try {
+      await window.ledgerApi.seedDemoData();
+      await refreshDashboard();
+      setStatusMessage("サンプルデータを投入しました。");
+    } catch (error) {
+      setStatusMessage(toErrorMessage(error, "サンプルデータの投入に失敗しました。"));
+    }
   }
 
   async function handleDelete(id: number): Promise<void> {
     if (!window.confirm(`伝票 #${id} を削除します。`)) {
       return;
     }
-    await window.ledgerApi.deleteEntry(id);
-    if (form.id === id) {
-      resetForm();
+    try {
+      await window.ledgerApi.deleteEntry(id);
+      if (form.id === id) {
+        resetForm();
+      }
+      await refreshDashboard();
+      setStatusMessage(`伝票 #${id} を削除しました。`);
+    } catch (error) {
+      setStatusMessage(toErrorMessage(error, `伝票 #${id} の削除に失敗しました。`));
     }
-    await refreshDashboard();
-    setStatusMessage(`伝票 #${id} を削除しました。`);
   }
 
   return (

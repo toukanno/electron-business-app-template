@@ -38,6 +38,10 @@ const LEGACY_ORGANIZATION_NAMES = new Set([
   "LedgerFlow"
 ]);
 
+function isValidIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+}
+
 export class LedgerDatabase {
   private readonly db: DatabaseSync;
 
@@ -80,27 +84,31 @@ export class LedgerDatabase {
   }
 
   saveEntry(input: LedgerEntryInput): LedgerEntry {
+    const normalized = this.normalizeEntryInput(input);
     const now = new Date().toISOString();
-    if (input.id) {
-      this.db.prepare(`
+    if (normalized.id) {
+      const result = this.db.prepare(`
         UPDATE ledger_entries
         SET entry_date = ?, voucher_number = ?, department = ?, account_title = ?, counterparty = ?, description = ?, entry_type = ?, amount = ?, tax_amount = ?, notes = ?, updated_at = ?
         WHERE id = ?
       `).run(
-        input.entryDate,
-        input.voucherNumber,
-        input.department,
-        input.accountTitle,
-        input.counterparty,
-        input.description,
-        input.entryType,
-        input.amount,
-        input.taxAmount,
-        input.notes,
+        normalized.entryDate,
+        normalized.voucherNumber,
+        normalized.department,
+        normalized.accountTitle,
+        normalized.counterparty,
+        normalized.description,
+        normalized.entryType,
+        normalized.amount,
+        normalized.taxAmount,
+        normalized.notes,
         now,
-        input.id
+        normalized.id
       );
-      return this.getEntry(input.id);
+      if (result.changes === 0) {
+        throw new Error(`Entry not found: ${normalized.id}`);
+      }
+      return this.getEntry(normalized.id);
     }
 
     const result = this.db.prepare(`
@@ -108,16 +116,16 @@ export class LedgerDatabase {
         entry_date, voucher_number, department, account_title, counterparty, description, entry_type, amount, tax_amount, notes, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      input.entryDate,
-      input.voucherNumber,
-      input.department,
-      input.accountTitle,
-      input.counterparty,
-      input.description,
-      input.entryType,
-      input.amount,
-      input.taxAmount,
-      input.notes,
+      normalized.entryDate,
+      normalized.voucherNumber,
+      normalized.department,
+      normalized.accountTitle,
+      normalized.counterparty,
+      normalized.description,
+      normalized.entryType,
+      normalized.amount,
+      normalized.taxAmount,
+      normalized.notes,
       now,
       now
     );
@@ -187,6 +195,13 @@ export class LedgerDatabase {
   }
 
   saveSettings(settings: AppSettings): AppSettings {
+    const organizationName = settings.organizationName.trim();
+    if (!organizationName) {
+      throw new Error("Organization name is required.");
+    }
+    if (!Number.isInteger(settings.fiscalYearStartMonth) || settings.fiscalYearStartMonth < 1 || settings.fiscalYearStartMonth > 12) {
+      throw new Error("Fiscal year start month must be between 1 and 12.");
+    }
     this.db.prepare(`
       INSERT INTO app_settings (id, organization_name, fiscal_year_start_month, updated_at)
       VALUES (1, ?, ?, ?)
@@ -194,7 +209,7 @@ export class LedgerDatabase {
         organization_name = excluded.organization_name,
         fiscal_year_start_month = excluded.fiscal_year_start_month,
         updated_at = excluded.updated_at
-    `).run(settings.organizationName, settings.fiscalYearStartMonth, new Date().toISOString());
+    `).run(organizationName, settings.fiscalYearStartMonth, new Date().toISOString());
     return this.getSettings();
   }
 
@@ -320,5 +335,39 @@ export class LedgerDatabase {
       return;
     }
     this.saveSettings(DEFAULT_SETTINGS);
+  }
+
+  private normalizeEntryInput(input: LedgerEntryInput): LedgerEntryInput {
+    const normalized: LedgerEntryInput = {
+      id: input.id,
+      entryDate: input.entryDate,
+      voucherNumber: input.voucherNumber.trim(),
+      department: input.department.trim(),
+      accountTitle: input.accountTitle.trim(),
+      counterparty: input.counterparty.trim(),
+      description: input.description.trim(),
+      entryType: input.entryType,
+      amount: input.amount,
+      taxAmount: input.taxAmount,
+      notes: input.notes.trim()
+    };
+
+    if (!isValidIsoDate(normalized.entryDate)) {
+      throw new Error("Entry date must be a valid ISO date.");
+    }
+    if (!normalized.voucherNumber || !normalized.department || !normalized.accountTitle || !normalized.counterparty || !normalized.description) {
+      throw new Error("Required ledger fields must not be empty.");
+    }
+    if (normalized.entryType !== "income" && normalized.entryType !== "expense") {
+      throw new Error("Entry type must be income or expense.");
+    }
+    if (!Number.isFinite(normalized.amount) || normalized.amount < 0) {
+      throw new Error("Amount must be a non-negative number.");
+    }
+    if (!Number.isFinite(normalized.taxAmount) || normalized.taxAmount < 0) {
+      throw new Error("Tax amount must be a non-negative number.");
+    }
+
+    return normalized;
   }
 }

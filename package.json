@@ -8,6 +8,7 @@
     "build": "npm run clean && tsc -p tsconfig.main.json && node scripts/build-renderer.mjs",
     "dev": "npm run build && electron .",
     "start": "npm run build && electron .",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip",
     "dist:win": "npm run build && electron-builder --win portable",
     "test": "vitest run"
   },
@@ -53,6 +54,13 @@
     "win": {
       "target": [
         "portable"
+      ]
+    },
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        "dmg",
+        "zip"
       ]
     }
   }

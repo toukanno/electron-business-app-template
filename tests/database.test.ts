@@ -68,4 +68,42 @@ describe("LedgerDatabase", () => {
     expect(summary.balance).toBe(180000);
     expect(summary.entryCount).toBe(2);
   });
+
+  it("rejects invalid entry payloads", () => {
+    const database = new LedgerDatabase(":memory:");
+    databases.push(database);
+
+    expect(() =>
+      database.saveEntry({
+        entryDate: "2026-05-40",
+        voucherNumber: " ",
+        department: "会計課",
+        accountTitle: "委託料",
+        counterparty: "外部ベンダー",
+        description: "帳簿移行作業",
+        entryType: "expense",
+        amount: -1,
+        taxAmount: 0,
+        notes: ""
+      })
+    ).toThrow();
+  });
+
+  it("normalizes settings and validates fiscal year month", () => {
+    const database = new LedgerDatabase(":memory:");
+    databases.push(database);
+
+    const saved = database.saveSettings({
+      organizationName: "  新組織名  ",
+      fiscalYearStartMonth: 4
+    });
+
+    expect(saved.organizationName).toBe("新組織名");
+    expect(() =>
+      database.saveSettings({
+        organizationName: "新組織名",
+        fiscalYearStartMonth: 13
+      })
+    ).toThrow();
+  });
 });
