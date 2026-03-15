@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { AppSettings, ExportResult, LedgerEntry, LedgerEntryInput, LedgerFilters, MonthlySummary } from "../shared/types";
+import type { AppSettings, ExportResult, ImportResult, LedgerEntry, LedgerEntryInput, LedgerFilters, MonthlySummary } from "../shared/types";
 
 const api = {
   listEntries: (filters: LedgerFilters): Promise<LedgerEntry[]> => ipcRenderer.invoke("ledger:list", filters),
@@ -9,6 +9,8 @@ const api = {
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke("settings:get"),
   saveSettings: (settings: AppSettings): Promise<AppSettings> => ipcRenderer.invoke("settings:save", settings),
   exportCsv: (filters: LedgerFilters): Promise<ExportResult> => ipcRenderer.invoke("ledger:exportCsv", filters),
+  exportExcel: (filters: LedgerFilters): Promise<ExportResult> => ipcRenderer.invoke("ledger:exportExcel", filters),
+  importExcel: (): Promise<ImportResult> => ipcRenderer.invoke("ledger:importExcel"),
   seedDemoData: (): Promise<boolean> => ipcRenderer.invoke("ledger:seedDemoData")
 };
 
