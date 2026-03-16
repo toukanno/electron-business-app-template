@@ -33,7 +33,6 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const LEGACY_ORGANIZATION_NAMES = new Set([
-  "省庁向け会計帳簿システム",
   "会計帳簿システム",
   "LedgerFlow"
 ]);
