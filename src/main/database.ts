@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { app } from "electron";
 import type { AppSettings, LedgerEntry, LedgerEntryInput, LedgerFilters, MonthlySummary } from "../shared/types";
@@ -253,7 +253,7 @@ export class LedgerDatabase {
   }
 
   private createDefaultDatabasePath(): string {
-    return `${app.getPath("userData")}\\ledger.sqlite`;
+    return join(app.getPath("userData"), "ledger.sqlite");
   }
 
   private getEntry(id: number): LedgerEntry {
