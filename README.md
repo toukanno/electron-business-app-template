@@ -13,6 +13,14 @@ Electron + TypeScript + React + Tailwind CSS + SQLite で構築した、業務�
 - Excel 出力（Excel XML）
 - CSV 出力
 
+## Tech Stack
+
+- Electron
+- TypeScript
+- React
+- Tailwind CSS
+- SQLite (better-sqlite3)
+
 ## セットアップ
 
 ```bash
