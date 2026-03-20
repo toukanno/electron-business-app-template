@@ -19,7 +19,7 @@ Electron + TypeScript + React + Tailwind CSS + SQLite で構築した、業務�
 - TypeScript
 - React
 - Tailwind CSS
-- SQLite (better-sqlite3)
+- SQLite (node:sqlite built-in)
 
 ## セットアップ
 
