@@ -96,93 +96,190 @@ function parseSpreadsheetXml(content: string): string[][] {
   });
 }
 
-function parseCsv(content: string): string[][] {
-  return content
-    .split(/\r?\n/)
-    .filter((line) => line.length > 0)
-    .map((line) =>
-      line
-        .split(",")
-        .map((cell) => cell.trim().replace(/^"|"$/g, "").replaceAll('""', '"'))
-    );
+export function parseCsv(content: string): string[][] {
+  const rows: string[][] = [];
+  const lines = content.split(/\r?\n/);
+
+  for (const line of lines) {
+    if (line.length === 0) continue;
+
+    const cells: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    let i = 0;
+
+    while (i < line.length) {
+      const char = line[i]!;
+      if (inQuotes) {
+        if (char === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') {
+            current += '"';
+            i += 2;
+          } else {
+            inQuotes = false;
+            i += 1;
+          }
+        } else {
+          current += char;
+          i += 1;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+          i += 1;
+        } else if (char === ',') {
+          cells.push(current.trim());
+          current = "";
+          i += 1;
+        } else {
+          current += char;
+          i += 1;
+        }
+      }
+    }
+    cells.push(current.trim());
+    rows.push(cells);
+  }
+
+  return rows;
 }
 
 export function registerLedgerIpc(database: LedgerDatabase, window: BrowserWindow): void {
-  ipcMain.handle("ledger:list", (_event, filters: LedgerFilters) => database.listEntries(filters));
-  ipcMain.handle("ledger:summary", (_event, filters: LedgerFilters) => database.getSummary(filters));
-  ipcMain.handle("ledger:save", (_event, input: LedgerEntryInput) => database.saveEntry(input));
-  ipcMain.handle("ledger:delete", (_event, id: number) => {
-    database.deleteEntry(id);
-    return true;
+  ipcMain.handle("ledger:list", (_event, filters: LedgerFilters) => {
+    try {
+      return database.listEntries(filters);
+    } catch (error) {
+      console.error("ledger:list failed:", error);
+      throw new Error(`データ取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    }
   });
-  ipcMain.handle("settings:get", () => database.getSettings());
-  ipcMain.handle("settings:save", (_event, settings: AppSettings) => database.saveSettings(settings));
+  ipcMain.handle("ledger:summary", (_event, filters: LedgerFilters) => {
+    try {
+      return database.getSummary(filters);
+    } catch (error) {
+      console.error("ledger:summary failed:", error);
+      throw new Error(`集計に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+  ipcMain.handle("ledger:save", (_event, input: LedgerEntryInput) => {
+    try {
+      return database.saveEntry(input);
+    } catch (error) {
+      console.error("ledger:save failed:", error);
+      throw new Error(`伝票の保存に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+  ipcMain.handle("ledger:delete", (_event, id: number) => {
+    try {
+      database.deleteEntry(id);
+      return true;
+    } catch (error) {
+      console.error("ledger:delete failed:", error);
+      throw new Error(`伝票の削除に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+  ipcMain.handle("settings:get", () => {
+    try {
+      return database.getSettings();
+    } catch (error) {
+      console.error("settings:get failed:", error);
+      throw new Error(`設定の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+  ipcMain.handle("settings:save", (_event, settings: AppSettings) => {
+    try {
+      return database.saveSettings(settings);
+    } catch (error) {
+      console.error("settings:save failed:", error);
+      throw new Error(`設定の保存に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
   ipcMain.handle("ledger:seedDemoData", () => {
-    database.seedDemoData();
-    return true;
+    try {
+      database.seedDemoData();
+      return true;
+    } catch (error) {
+      console.error("ledger:seedDemoData failed:", error);
+      throw new Error(`サンプルデータの投入に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    }
   });
   ipcMain.handle("ledger:exportCsv", async (_event, filters: LedgerFilters): Promise<ExportResult> => {
-    const saveResult = await dialog.showSaveDialog(window, {
-      defaultPath: "ledger-export.csv",
-      filters: [{ name: "CSV", extensions: ["csv"] }]
-    });
+    try {
+      const saveResult = await dialog.showSaveDialog(window, {
+        defaultPath: "ledger-export.csv",
+        filters: [{ name: "CSV", extensions: ["csv"] }]
+      });
 
-    if (saveResult.canceled || !saveResult.filePath) {
-      return { canceled: true };
+      if (saveResult.canceled || !saveResult.filePath) {
+        return { canceled: true };
+      }
+
+      const header = ["伝票番号", "日付", "部門", "勘定科目", "区分", "取引先", "摘要", "金額", "税額", "備考"];
+      const rows = toEntryRows(database, filters);
+      const csv = [header, ...rows].map((row) => row.map(toCsvCell).join(",")).join("\n");
+      await writeFile(saveResult.filePath, `\uFEFF${csv}`, "utf8");
+      return { canceled: false, filePath: saveResult.filePath };
+    } catch (error) {
+      console.error("ledger:exportCsv failed:", error);
+      throw new Error(`CSV出力に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    const header = ["伝票番号", "日付", "部門", "勘定科目", "区分", "取引先", "摘要", "金額", "税額", "備考"];
-    const rows = toEntryRows(database, filters);
-    const csv = [header, ...rows].map((row) => row.map(toCsvCell).join(",")).join("\n");
-    await writeFile(saveResult.filePath, `\uFEFF${csv}`, "utf8");
-    return { canceled: false, filePath: saveResult.filePath };
   });
   ipcMain.handle("ledger:exportExcel", async (_event, filters: LedgerFilters): Promise<ExportResult> => {
-    const saveResult = await dialog.showSaveDialog(window, {
-      defaultPath: "ledger-export.xml",
-      filters: [{ name: "Excel XML", extensions: ["xml"] }]
-    });
+    try {
+      const saveResult = await dialog.showSaveDialog(window, {
+        defaultPath: "ledger-export.xml",
+        filters: [{ name: "Excel XML", extensions: ["xml"] }]
+      });
 
-    if (saveResult.canceled || !saveResult.filePath) {
-      return { canceled: true };
+      if (saveResult.canceled || !saveResult.filePath) {
+        return { canceled: true };
+      }
+
+      const header = ["伝票番号", "日付", "部門", "勘定科目", "区分", "取引先", "摘要", "金額", "税額", "備考"];
+      const rows = toEntryRows(database, filters);
+      await writeFile(saveResult.filePath, buildSpreadsheetXml([header, ...rows]), "utf8");
+      return { canceled: false, filePath: saveResult.filePath };
+    } catch (error) {
+      console.error("ledger:exportExcel failed:", error);
+      throw new Error(`Excel出力に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    const header = ["伝票番号", "日付", "部門", "勘定科目", "区分", "取引先", "摘要", "金額", "税額", "備考"];
-    const rows = toEntryRows(database, filters);
-    await writeFile(saveResult.filePath, buildSpreadsheetXml([header, ...rows]), "utf8");
-    return { canceled: false, filePath: saveResult.filePath };
   });
   ipcMain.handle("ledger:importExcel", async (): Promise<ImportResult> => {
-    const openResult = await dialog.showOpenDialog(window, {
-      properties: ["openFile"],
-      filters: [{ name: "Excel/CSV", extensions: ["xml", "csv"] }]
-    });
+    try {
+      const openResult = await dialog.showOpenDialog(window, {
+        properties: ["openFile"],
+        filters: [{ name: "Excel/CSV", extensions: ["xml", "csv"] }]
+      });
 
-    if (openResult.canceled || openResult.filePaths.length === 0) {
-      return { canceled: true };
-    }
-
-    const filePath = openResult.filePaths[0];
-    if (!filePath) {
-      return { canceled: true };
-    }
-
-    const content = await readFile(filePath, "utf8");
-    const rows = filePath.endsWith(".xml") ? parseSpreadsheetXml(content) : parseCsv(content.replace(/^\uFEFF/, ""));
-
-    let importedCount = 0;
-    const errors: string[] = [];
-    rows.slice(1).forEach((row, index) => {
-      const entry = mapImportValues(row);
-      const validationError = validateEntry(entry);
-      if (validationError) {
-        errors.push(`${index + 2}行目: ${validationError}`);
-        return;
+      if (openResult.canceled || openResult.filePaths.length === 0) {
+        return { canceled: true };
       }
-      database.saveEntry(entry);
-      importedCount += 1;
-    });
 
-    return { canceled: false, importedCount, errors };
+      const filePath = openResult.filePaths[0];
+      if (!filePath) {
+        return { canceled: true };
+      }
+
+      const content = await readFile(filePath, "utf8");
+      const rows = filePath.endsWith(".xml") ? parseSpreadsheetXml(content) : parseCsv(content.replace(/^\uFEFF/, ""));
+
+      let importedCount = 0;
+      const errors: string[] = [];
+      rows.slice(1).forEach((row, index) => {
+        const entry = mapImportValues(row);
+        const validationError = validateEntry(entry);
+        if (validationError) {
+          errors.push(`${index + 2}行目: ${validationError}`);
+          return;
+        }
+        database.saveEntry(entry);
+        importedCount += 1;
+      });
+
+      return { canceled: false, importedCount, errors };
+    } catch (error) {
+      console.error("ledger:importExcel failed:", error);
+      throw new Error(`ファイル取込に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    }
   });
 }

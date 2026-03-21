@@ -26,6 +26,29 @@ function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function currentFiscalYearLabel(fiscalYearStartMonth: number): string {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const fiscalYear = currentMonth >= fiscalYearStartMonth ? currentYear : currentYear - 1;
+  if (fiscalYearStartMonth === 1) return `${fiscalYear}年度`;
+  return `${fiscalYear}年度（${fiscalYearStartMonth}月始まり）`;
+}
+
+function getFiscalYearMonths(fiscalYearStartMonth: number): string[] {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const fiscalYear = currentMonth >= fiscalYearStartMonth ? currentYear : currentYear - 1;
+  const months: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    const month = ((fiscalYearStartMonth - 1 + i) % 12) + 1;
+    const year = fiscalYearStartMonth + i > 12 ? fiscalYear + 1 : fiscalYear;
+    months.push(`${year}-${String(month).padStart(2, "0")}`);
+  }
+  return months;
+}
+
 function defaultEntryForm(): EntryFormState {
   return {
     entryDate: todayDate(),
@@ -90,7 +113,10 @@ function App(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
-    void refreshDashboard(filters);
+    void refreshDashboard(filters).catch((error) => {
+      console.error(error);
+      setStatusMessage("データの取得に失敗しました。");
+    });
   }, [filters.month, filters.entryType, filters.keyword]);
 
   const fiscalMonthOptions = Array.from({ length: 12 }, (_, index) => ({ value: index + 1, label: `${index + 1}月` }));
@@ -117,73 +143,108 @@ function App(): React.JSX.Element {
       return;
     }
 
-    await window.ledgerApi.saveEntry({
-      id: form.id,
-      entryDate: form.entryDate,
-      voucherNumber: form.voucherNumber.trim(),
-      department: form.department.trim(),
-      accountTitle: form.accountTitle.trim(),
-      counterparty: form.counterparty.trim(),
-      description: form.description.trim(),
-      entryType: form.entryType,
-      amount,
-      taxAmount,
-      notes: form.notes.trim()
-    });
-    resetForm();
-    await refreshDashboard();
-    setStatusMessage("伝票を保存しました。");
+    try {
+      await window.ledgerApi.saveEntry({
+        id: form.id,
+        entryDate: form.entryDate,
+        voucherNumber: form.voucherNumber.trim(),
+        department: form.department.trim(),
+        accountTitle: form.accountTitle.trim(),
+        counterparty: form.counterparty.trim(),
+        description: form.description.trim(),
+        entryType: form.entryType,
+        amount,
+        taxAmount,
+        notes: form.notes.trim()
+      });
+      resetForm();
+      await refreshDashboard();
+      setStatusMessage("伝票を保存しました。");
+    } catch (error) {
+      console.error(error);
+      setStatusMessage("伝票の保存に失敗しました。");
+    }
   }
 
   async function handleSaveSettings(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    const saved = await window.ledgerApi.saveSettings(settings);
-    setSettings(saved);
-    setStatusMessage("設定を保存しました。");
+    try {
+      const saved = await window.ledgerApi.saveSettings(settings);
+      setSettings(saved);
+      setStatusMessage("設定を保存しました。");
+    } catch (error) {
+      console.error(error);
+      setStatusMessage("設定の保存に失敗しました。");
+    }
   }
 
   async function handleExportCsv(): Promise<void> {
-    const result = await window.ledgerApi.exportCsv(filters);
-    setStatusMessage(result.canceled ? "CSV出力をキャンセルしました。" : `CSVを出力しました: ${result.filePath}`);
+    try {
+      const result = await window.ledgerApi.exportCsv(filters);
+      setStatusMessage(result.canceled ? "CSV出力をキャンセルしました。" : `CSVを出力しました: ${result.filePath}`);
+    } catch (error) {
+      console.error(error);
+      setStatusMessage("CSV出力に失敗しました。");
+    }
   }
 
   async function handleExportExcel(): Promise<void> {
-    const result = await window.ledgerApi.exportExcel(filters);
-    setStatusMessage(result.canceled ? "Excel出力をキャンセルしました。" : `Excelを出力しました: ${result.filePath}`);
+    try {
+      const result = await window.ledgerApi.exportExcel(filters);
+      setStatusMessage(result.canceled ? "Excel出力をキャンセルしました。" : `Excelを出力しました: ${result.filePath}`);
+    } catch (error) {
+      console.error(error);
+      setStatusMessage("Excel出力に失敗しました。");
+    }
   }
 
   async function handleImportExcel(): Promise<void> {
-    const result = await window.ledgerApi.importExcel();
-    if (result.canceled) {
-      setStatusMessage("Excel取込をキャンセルしました。");
-      return;
-    }
+    try {
+      const result = await window.ledgerApi.importExcel();
+      if (result.canceled) {
+        setStatusMessage("Excel取込をキャンセルしました。");
+        return;
+      }
 
-    await refreshDashboard();
-    if ((result.errors?.length ?? 0) > 0) {
-      setStatusMessage(`Excelを${result.importedCount ?? 0}件取り込みました（エラー${result.errors?.length ?? 0}件）。`);
-      return;
-    }
+      await refreshDashboard();
+      if ((result.errors?.length ?? 0) > 0) {
+        setStatusMessage(`Excelを${result.importedCount ?? 0}件取り込みました（エラー${result.errors?.length ?? 0}件）。`);
+        return;
+      }
 
-    setStatusMessage(`Excelを${result.importedCount ?? 0}件取り込みました。`);
+      setStatusMessage(`Excelを${result.importedCount ?? 0}件取り込みました。`);
+    } catch (error) {
+      console.error(error);
+      setStatusMessage("ファイル取込に失敗しました。");
+    }
   }
 
   async function handleSeed(): Promise<void> {
-    await window.ledgerApi.seedDemoData();
-    await refreshDashboard();
-    setStatusMessage("サンプルデータを投入しました。");
+    try {
+      await window.ledgerApi.seedDemoData();
+      await refreshDashboard();
+      setStatusMessage("サンプルデータを投入しました。");
+    } catch (error) {
+      console.error(error);
+      setStatusMessage("サンプルデータの投入に失敗しました。");
+    }
   }
 
   async function handleDelete(id: number): Promise<void> {
     if (!window.confirm(`伝票 #${id} を削除します。`)) {
       return;
     }
-    await window.ledgerApi.deleteEntry(id);
-    if (form.id === id) {
-      resetForm();
+    try {
+      await window.ledgerApi.deleteEntry(id);
+      if (form.id === id) {
+        resetForm();
+      }
+      await refreshDashboard();
+      setStatusMessage(`伝票 #${id} を削除しました。`);
+    } catch (error) {
+      console.error(error);
+      setStatusMessage("伝票の削除に失敗しました。");
     }
-    await refreshDashboard();
-    setStatusMessage(`伝票 #${id} を削除しました。`);
   }
 
   return (
@@ -263,7 +324,7 @@ function App(): React.JSX.Element {
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <InfoChip label="伝票件数" value={`${summary.entryCount}件`} />
-                <InfoChip label="検索月" value={filters.month || "全期間"} />
+                <InfoChip label="年度" value={currentFiscalYearLabel(settings.fiscalYearStartMonth)} />
               </div>
             </Panel>
           </aside>
@@ -323,8 +384,13 @@ function App(): React.JSX.Element {
             </Panel>
 
             <Panel title="帳簿一覧" subtitle="月、区分、キーワードで即時に絞り込みできます。">
-              <div className="mb-5 grid gap-3 lg:grid-cols-[180px_180px_minmax(0,1fr)]">
-                <input className="input" type="month" value={filters.month} onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))} />
+              <div className="mb-5 grid gap-3 lg:grid-cols-[220px_180px_minmax(0,1fr)]">
+                <select className="input" value={filters.month} onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))}>
+                  <option value="">全期間</option>
+                  {getFiscalYearMonths(settings.fiscalYearStartMonth).map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
                 <select className="input" value={filters.entryType} onChange={(event) => setFilters((current) => ({ ...current, entryType: event.target.value as LedgerFilters["entryType"] }))}>
                   <option value="">すべて</option>
                   <option value="income">収入</option>
