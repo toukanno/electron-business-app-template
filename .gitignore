@@ -3,3 +3,10 @@ dist/
 release/
 *.log
 *.sqlite
+
+# Common rules (auto-added)
+.DS_Store
+Thumbs.db
+build/
+.env
+.idea/
