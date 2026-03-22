@@ -2,6 +2,7 @@
   "extends": "./tsconfig.main.json",
   "compilerOptions": {
     "noEmit": true,
+    "rootDir": ".",
     "jsx": "react-jsx"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]

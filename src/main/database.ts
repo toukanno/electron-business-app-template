@@ -52,24 +52,7 @@ export class LedgerDatabase {
   }
 
   listEntries(filters: LedgerFilters): LedgerEntry[] {
-    const conditions: string[] = [];
-    const values: (string | number)[] = [];
-
-    if (filters.month) {
-      conditions.push("substr(entry_date, 1, 7) = ?");
-      values.push(filters.month);
-    }
-    if (filters.entryType) {
-      conditions.push("entry_type = ?");
-      values.push(filters.entryType);
-    }
-    if (filters.keyword) {
-      conditions.push("(voucher_number LIKE ? OR department LIKE ? OR account_title LIKE ? OR counterparty LIKE ? OR description LIKE ? OR notes LIKE ?)");
-      const keyword = `%${filters.keyword}%`;
-      values.push(keyword, keyword, keyword, keyword, keyword, keyword);
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const { whereClause, values } = this.buildWhereClause(filters);
     const statement = this.db.prepare(`
       SELECT id, entry_date, voucher_number, department, account_title, counterparty, description, entry_type, amount, tax_amount, notes, created_at, updated_at
       FROM ledger_entries
@@ -129,24 +112,7 @@ export class LedgerDatabase {
   }
 
   getSummary(filters: LedgerFilters): MonthlySummary {
-    const conditions: string[] = [];
-    const values: (string | number)[] = [];
-
-    if (filters.month) {
-      conditions.push("substr(entry_date, 1, 7) = ?");
-      values.push(filters.month);
-    }
-    if (filters.entryType) {
-      conditions.push("entry_type = ?");
-      values.push(filters.entryType);
-    }
-    if (filters.keyword) {
-      conditions.push("(voucher_number LIKE ? OR department LIKE ? OR account_title LIKE ? OR counterparty LIKE ? OR description LIKE ? OR notes LIKE ?)");
-      const keyword = `%${filters.keyword}%`;
-      values.push(keyword, keyword, keyword, keyword, keyword, keyword);
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const { whereClause, values } = this.buildWhereClause(filters);
     const row = this.db.prepare(`
       SELECT
         SUM(CASE WHEN entry_type = 'income' THEN amount ELSE 0 END) AS totalIncome,
@@ -285,6 +251,28 @@ export class LedgerDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
+  }
+
+  private buildWhereClause(filters: LedgerFilters): { whereClause: string; values: (string | number)[] } {
+    const conditions: string[] = [];
+    const values: (string | number)[] = [];
+
+    if (filters.month) {
+      conditions.push("substr(entry_date, 1, 7) = ?");
+      values.push(filters.month);
+    }
+    if (filters.entryType) {
+      conditions.push("entry_type = ?");
+      values.push(filters.entryType);
+    }
+    if (filters.keyword) {
+      conditions.push("(voucher_number LIKE ? OR department LIKE ? OR account_title LIKE ? OR counterparty LIKE ? OR description LIKE ? OR notes LIKE ?)");
+      const keyword = `%${filters.keyword}%`;
+      values.push(keyword, keyword, keyword, keyword, keyword, keyword);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    return { whereClause, values };
   }
 
   private migrate(): void {
